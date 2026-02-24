@@ -1,0 +1,87 @@
+---
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - nginx
+      - git
+      - rsync
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+    lock_timeout: 300
+  tags: [lighthouse, nginx]
+
+- name: Create Lighthouse source dir
+  ansible.builtin.file:
+    path: "{{ lighthouse_src_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [lighthouse]
+
+- name: Create lighthouse web root
+  ansible.builtin.file:
+    path: "{{ lighthouse_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [lighthouse]
+
+- name: Clone Lighthouse sources
+  ansible.builtin.git:
+    repo: "{{ lighthouse_repo }}"
+    dest: "{{ lighthouse_src_dir }}"
+    version: "{{ lighthouse_version }}"
+    force: true
+    update: true
+  tags: [lighthouse]
+
+- name: Sync Lighthouse files to web root
+  ansible.posix.synchronize:
+    src: "{{ lighthouse_src_dir }}/"
+    dest: "{{ lighthouse_root }}/"
+    delete: true
+    recursive: true
+  delegate_to: "{{ inventory_hostname }}"
+  tags: [lighthouse]
+
+- name: Install nginx vhost for Lighthouse
+  ansible.builtin.template:
+    src: lighthouse.nginx.conf.j2
+    dest: /etc/nginx/sites-available/lighthouse.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload nginx
+  tags: [lighthouse, nginx]
+
+- name: Validate nginx configuration
+  ansible.builtin.command: nginx -t
+  register: nginx_test
+  changed_when: false
+  tags: [nginx]
+
+- name: Disable default nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx
+  tags: [nginx]
+
+- name: Enable Lighthouse site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/lighthouse.conf
+    dest: /etc/nginx/sites-enabled/lighthouse.conf
+    state: link
+    force: true
+  notify: Reload nginx
+  tags: [nginx]
+
+- name: Ensure nginx is started and enabled
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
+  tags: [nginx]

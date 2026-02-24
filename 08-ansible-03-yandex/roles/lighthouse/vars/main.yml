@@ -1,0 +1,9 @@
+---
+lighthouse_repo: "https://github.com/VKCOM/lighthouse.git"
+lighthouse_version: "master"
+
+lighthouse_src_dir: "/opt/lighthouse"
+lighthouse_root: "/var/www/lighthouse"
+
+nginx_listen_port: 80
+nginx_server_name: "_"
